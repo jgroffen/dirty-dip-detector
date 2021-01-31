@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dirty Dip Detector</title>
+    <style>
+        body {
+            font-family: Consolas, sans-serif;
+            text-align: center;
+        }
+        li {
+            text-align: left;
+        }
+        button, input {
+            font-family: Consolas, sans-serif;
+            font-size: large;
+        }
+
+        #localTime {
+            font-size: large;
+        }
+        #ticker {
+            max-width: 280px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #priceAlarm {
+            width: 80px;
+        }
+    </style>
+</head>
+<body>
+<h1>DIRTY DIP DETECTOR</h1>
+
+<p>
+    <label for="priceAlarm">Wake me up when the price hits:</label><input id="priceAlarm" type="number" value="1000" />
+    <button id="testAlarm">test</button>
+</p>
+
+<p><button id="toggleTracking">Start Tracking</button></p>
+
+<p>Last 10 readings (from Yahoo API)</p>
+<ol id="ticker">
+</ol>
+
+
+<p>If your computer goes to sleep, so does this page.</p>
+<p>Your computer thinks the time is: <span id="localTime">gimmie a sec ...</span></p>
+
+<script type="module">
+    let trackingEnabled = false;
+    let QUERY_INTERVAL = 30;
+    let lastQueryTime = 0;
+    let queryTemplate = "https://query1.finance.yahoo.com/v8/finance/chart/GME";
+    let priceHistory = [];
+
+    // elements that will be fiddled with
+    let localTimeSpan = document.getElementById("localTime");
+    let ticker = document.getElementById("ticker");
+    let priceAlarm = document.getElementById("priceAlarm");
+    let toggleTrackingButton = document.getElementById("toggleTracking");
+    let testButton = document.getElementById("testAlarm");
+
+    window.onload = function() {
+        for(let i = 0; i < 10; i++) {
+            let li=document.createElement('li');
+            li.id="tracker" + i;
+            li.innerText = "...";
+            ticker.appendChild(li);
+            priceHistory[i] = { text: "..." };
+        }
+
+        toggleTrackingButton.onclick = toggleTracking;
+        testButton.onclick = triggerAlarm;
+
+        setInterval(trackerDude, 1000);
+    };
+
+    let toggleTracking = function() {
+        trackingEnabled = !trackingEnabled;
+        if(trackingEnabled) {
+            toggleTrackingButton.innerText = "Stop Tracking";
+        } else {
+            toggleTrackingButton.innerText = "Start Tracking";
+        }
+    };
+
+    let trackerDude = function() {
+        if(trackingEnabled) {
+            if(lastQueryTime + (QUERY_INTERVAL * 1000) < Date.now()) {
+                lastQueryTime = Date.now();
+                getPrice();
+            }
+        }
+        updateTime();
+    };
+
+    let getPrice = function() {
+        // have to deal with CORS
+        let cors_api_host = 'cors-anywhere.herokuapp.com';
+        let cors_api_url = 'https://' + cors_api_host + '/';
+        // let slice = [].slice;
+        // let origin = window.location.protocol + '//' + window.location.host;
+        let query = cors_api_url + queryTemplate;
+
+        // url (required), options (optional)
+        fetch(query, {
+            mode: 'cors',
+            method: 'get'
+        }).then(function(response) {
+            response.json().then(data => readPriceFromJSON(data));
+        }).catch(function(err) {
+            // Error :(
+            console.log(err);
+            updateHistory({
+                text: "I AM ERROR"
+            });
+        });
+    };
+
+    let readPriceFromJSON = function(data) {
+        let price = data.chart.result[0].meta.regularMarketPrice;
+        let time = data.chart.result[0].meta.regularMarketTime;
+        let timeString = new Date(time * 1000).toLocaleString();
+        let newPrice = {
+            regularMarketPrice: price,
+            regularMarketTime: time,
+            text: price + " at " + timeString
+        };
+        console.log(newPrice);
+        updateHistory(newPrice);
+        checkForAlarm(newPrice);
+    };
+
+    let updateHistory = function(newPrice) {
+        priceHistory.pop();
+        priceHistory.unshift(newPrice);
+        for(let i = 0; i < priceHistory.length; i++) {
+            let thisTracker = document.getElementById("tracker" + i);
+            if(thisTracker) {
+                thisTracker.innerText = priceHistory[i].text;
+            }
+        }
+    };
+
+    let updateTime = function() {
+        if(localTimeSpan) {
+            localTimeSpan.innerText = new Date().toLocaleString();
+        }
+    };
+
+    let checkForAlarm = function(newPrice) {
+        let alarmAt = priceAlarm.value;
+        if(newPrice.hasOwnProperty("regularMarketPrice")) {
+            if (newPrice.regularMarketPrice >= alarmAt) {
+                triggerAlarm();
+            }
+        }
+    };
+
+    let triggerAlarm = function() {
+        let alarmUrl = "https://www.youtube.com/watch?v=ZEcqHA7dbwM&t=7";
+        let alarmEmbedCode = "<iframe width=\"560\" height=\"315\" src=\"https://www.youtube.com/embed/ZEcqHA7dbwM?start=7&autoplay=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>"
+        document.body.insertAdjacentHTML("beforeend", alarmEmbedCode);
+        //document.body.append(alarmEmbedCode);
+    };
+
+</script>
+</body>
+</html>
