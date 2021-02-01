@@ -20,24 +20,36 @@
             font-size: large;
         }
         #ticker {
-            max-width: 280px;
+            max-width: 350px;
             margin-left: auto;
             margin-right: auto;
         }
-        #priceAlarm {
+        #dipAlarm, #skyAlarm, #stockCode {
             width: 80px;
         }
+        #toggleDipAlarm, #toggleSkyAlarm {
+            width: 50px;
+        }
+		.on {
+			background-color: lime;
+		}
     </style>
 </head>
 <body>
 <h1>DIRTY DIP DETECTOR</h1>
 
 <p>
-    <label for="priceAlarm">Wake me up when the price hits:</label><input id="priceAlarm" type="number" value="1000" />
-    <button id="testAlarm">test</button>
+    <label for="stockCode">Stock Code:</label><input id="stockCode" type="text" value="GME" />
+</p><p>
+    <label for="dipAlarm">Wake me up when the price is at or below:</label><input id="dipAlarm" type="number" value="100" /> <button class="on" id="toggleDipAlarm">ON</button>
+</p><p>
+    <label for="skyAlarm">Wake me up when the price is at or above:</label><input id="skyAlarm" type="number" value="1000" /> <button class="on" id="toggleSkyAlarm">ON</button>
 </p>
 
-<p><button id="toggleTracking">Start Tracking</button></p>
+<p>
+    <button id="testAlarm">test</button>
+	<button id="toggleTracking">Start Tracking</button>
+</p>
 
 <p>Last 10 readings (from Yahoo API)</p>
 <ol id="ticker">
@@ -48,16 +60,25 @@
 <p>Your computer thinks the time is: <span id="localTime">gimmie a sec ...</span></p>
 
 <script type="module">
+	const DIP_VID = "https://www.youtube.com/watch?v=l482T0yNkeo&autoplay=1";
+	const SKY_VID = "https://www.youtube.com/embed/ZEcqHA7dbwM?start=7&autoplay=1";
+
     let trackingEnabled = false;
+    let dipAlarmEnabled = true;
+    let skyAlarmEnabled = true;
     let QUERY_INTERVAL = 30;
     let lastQueryTime = 0;
-    let queryTemplate = "https://query1.finance.yahoo.com/v8/finance/chart/GME";
+    let queryTemplate = "https://query1.finance.yahoo.com/v8/finance/chart/{STOCK_CODE}";
     let priceHistory = [];
 
     // elements that will be fiddled with
     let localTimeSpan = document.getElementById("localTime");
     let ticker = document.getElementById("ticker");
-    let priceAlarm = document.getElementById("priceAlarm");
+    let stockCode = document.getElementById("stockCode");
+    let dipAlarm = document.getElementById("dipAlarm");
+    let skyAlarm = document.getElementById("skyAlarm");
+    let toggleDipAlarmButton = document.getElementById("toggleDipAlarm");
+    let toggleSkyAlarmButton = document.getElementById("toggleSkyAlarm");
     let toggleTrackingButton = document.getElementById("toggleTracking");
     let testButton = document.getElementById("testAlarm");
 
@@ -71,7 +92,11 @@
         }
 
         toggleTrackingButton.onclick = toggleTracking;
-        testButton.onclick = triggerAlarm;
+        toggleDipAlarmButton.onclick = toggleDipAlarm;
+        toggleSkyAlarmButton.onclick = toggleSkyAlarm;
+        testButton.onclick = function() {
+			triggerAlarm(DIP_VID);
+		}
 
         setInterval(trackerDude, 1000);
     };
@@ -104,6 +129,26 @@
 		}
 	};
 
+	let toggleDipAlarm = function() {
+        dipAlarmEnabled = !dipAlarmEnabled;
+		toggleToggleButton(dipAlarmEnabled, toggleDipAlarmButton)
+	};
+	
+	let toggleSkyAlarm = function() {
+        skyAlarmEnabled = !skyAlarmEnabled;
+		toggleToggleButton(skyAlarmEnabled, toggleSkyAlarmButton)
+	};
+	
+	let toggleToggleButton = function(val, btn) {
+        if(val) {
+            btn.innerText = "ON";
+			btn.className = "on"
+		} else {
+            btn.innerText = "OFF";
+			btn.className = ""
+		}		
+	};
+	
     let trackerDude = function() {
         if(trackingEnabled) {
             if(lastQueryTime + (QUERY_INTERVAL * 1000) < Date.now()) {
@@ -119,14 +164,16 @@
         // let cors_api_host = 'cors-anywhere.herokuapp.com';
 	let cors_api_host = 'knooks-corsanywhere.herokuapp.com'
         let cors_api_url = 'https://' + cors_api_host + '/';
-        let query = cors_api_url + queryTemplate;
+		let code = stockCode.value;
+
+        let query = cors_api_url + queryTemplate.replace("{STOCK_CODE}",code);
 
         // url (required), options (optional)
         fetch(query, {
             mode: 'cors',
             method: 'get'
         }).then(function(response) {
-            response.json().then(data => readPriceFromJSON(data));
+            response.json().then(data => readPriceFromJSON(code, data));
         }).catch(function(err) {
             // Error :(
             console.log(err);
@@ -136,14 +183,15 @@
         });
     };
 
-    let readPriceFromJSON = function(data) {
+    let readPriceFromJSON = function(code, data) {
         let price = data.chart.result[0].meta.regularMarketPrice;
         let time = data.chart.result[0].meta.regularMarketTime;
         let timeString = new Date(time * 1000).toLocaleString();
         let newPrice = {
+			code: code,
             regularMarketPrice: price,
             regularMarketTime: time,
-            text: price + " at " + timeString
+            text: code + ": " + price + " at " + timeString
         };
         console.log(newPrice);
         updateHistory(newPrice);
@@ -168,17 +216,25 @@
     };
 
     let checkForAlarm = function(newPrice) {
-        let alarmAt = priceAlarm.value;
         if(newPrice.hasOwnProperty("regularMarketPrice")) {
-            if (newPrice.regularMarketPrice >= alarmAt) {
-                triggerAlarm();
-            }
-        }
+			if(dipAlarmEnabled) {
+				let alarmAt = dipAlarm.value;
+				if (newPrice.regularMarketPrice <= alarmAt) {
+					triggerAlarm(DIP_VID);
+				}
+			}
+
+			if(skyAlarmEnabled) {
+				let alarmAt = skyAlarm.value;
+				if (newPrice.regularMarketPrice >= alarmAt) {
+					triggerAlarm(SKY_VID);
+				}
+			}
+		}
     };
 
-    let triggerAlarm = function() {
-        let alarmUrl = "https://www.youtube.com/watch?v=ZEcqHA7dbwM&t=7";
-        let alarmEmbedCode = "<iframe id=\"toDaMoon\" width=\"560\" height=\"315\" src=\"https://www.youtube.com/embed/ZEcqHA7dbwM?start=7&autoplay=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>"
+    let triggerAlarm = function(url) {
+        let alarmEmbedCode = "<iframe id=\"toDaMoon\" width=\"560\" height=\"315\" src=\"" + url + "\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>"
         document.body.insertAdjacentHTML("beforeend", alarmEmbedCode);
 		stopTracking();
     };
