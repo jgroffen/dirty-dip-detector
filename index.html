@@ -80,10 +80,29 @@
         trackingEnabled = !trackingEnabled;
         if(trackingEnabled) {
             toggleTrackingButton.innerText = "Stop Tracking";
+			// reset alarm in case it's already been triggered
+			try {
+				document.getElementById("toDaMoon").remove();
+				lastQueryTime = 0;
+			} catch(err) {
+				console.log("No player to remove, this is fine ...");
+			}
         } else {
             toggleTrackingButton.innerText = "Start Tracking";
         }
     };
+	
+	let startTracking = function() {
+		if(!trackingEnabled) {
+			toggleTracking();
+		}
+	};
+
+	let stopTracking = function() {
+		if(trackingEnabled) {
+			toggleTracking();
+		}
+	};
 
     let trackerDude = function() {
         if(trackingEnabled) {
@@ -100,8 +119,6 @@
         // let cors_api_host = 'cors-anywhere.herokuapp.com';
 	let cors_api_host = 'knooks-corsanywhere.herokuapp.com'
         let cors_api_url = 'https://' + cors_api_host + '/';
-        // let slice = [].slice;
-        // let origin = window.location.protocol + '//' + window.location.host;
         let query = cors_api_url + queryTemplate;
 
         // url (required), options (optional)
@@ -161,9 +178,9 @@
 
     let triggerAlarm = function() {
         let alarmUrl = "https://www.youtube.com/watch?v=ZEcqHA7dbwM&t=7";
-        let alarmEmbedCode = "<iframe width=\"560\" height=\"315\" src=\"https://www.youtube.com/embed/ZEcqHA7dbwM?start=7&autoplay=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>"
+        let alarmEmbedCode = "<iframe id=\"toDaMoon\" width=\"560\" height=\"315\" src=\"https://www.youtube.com/embed/ZEcqHA7dbwM?start=7&autoplay=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>"
         document.body.insertAdjacentHTML("beforeend", alarmEmbedCode);
-        //document.body.append(alarmEmbedCode);
+		stopTracking();
     };
 
 </script>
