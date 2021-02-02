@@ -33,6 +33,12 @@
 		.on {
 			background-color: lime;
 		}
+		.up {
+			color: #008000;
+		}
+		.down {
+			color: #800000;
+		}
     </style>
 </head>
 <body>
@@ -85,7 +91,7 @@
     window.onload = function() {
         for(let i = 0; i < 10; i++) {
             let li=document.createElement('li');
-            li.id="tracker" + i;
+            li.id="ticker" + i;
             li.innerText = "...";
             ticker.appendChild(li);
             priceHistory[i] = { text: "..." };
@@ -105,50 +111,50 @@
         trackingEnabled = !trackingEnabled;
         if(trackingEnabled) {
             toggleTrackingButton.innerText = "Stop Tracking";
-			// reset alarm in case it's already been triggered
-			try {
-				document.getElementById("toDaMoon").remove();
-				lastQueryTime = 0;
-			} catch(err) {
-				console.log("No player to remove, this is fine ...");
-			}
+            // reset alarm in case it's already been triggered
+            try {
+                document.getElementById("toDaMoon").remove();
+                lastQueryTime = 0;
+            } catch(err) {
+                console.log("No player to remove, this is fine ...");
+            }
         } else {
             toggleTrackingButton.innerText = "Start Tracking";
         }
     };
-	
-	let startTracking = function() {
-		if(!trackingEnabled) {
-			toggleTracking();
-		}
-	};
 
-	let stopTracking = function() {
-		if(trackingEnabled) {
-			toggleTracking();
-		}
-	};
+    let startTracking = function() {
+        if(!trackingEnabled) {
+            toggleTracking();
+        }
+    };
 
-	let toggleDipAlarm = function() {
+    let stopTracking = function() {
+        if(trackingEnabled) {
+            toggleTracking();
+        }
+    };
+
+    let toggleDipAlarm = function() {
         dipAlarmEnabled = !dipAlarmEnabled;
-		toggleToggleButton(dipAlarmEnabled, toggleDipAlarmButton)
-	};
-	
-	let toggleSkyAlarm = function() {
+        toggleToggleButton(dipAlarmEnabled, toggleDipAlarmButton)
+    };
+
+    let toggleSkyAlarm = function() {
         skyAlarmEnabled = !skyAlarmEnabled;
-		toggleToggleButton(skyAlarmEnabled, toggleSkyAlarmButton)
-	};
-	
-	let toggleToggleButton = function(val, btn) {
+        toggleToggleButton(skyAlarmEnabled, toggleSkyAlarmButton)
+    };
+
+    let toggleToggleButton = function(val, btn) {
         if(val) {
             btn.innerText = "ON";
-			btn.className = "on"
-		} else {
+            btn.className = "on"
+        } else {
             btn.innerText = "OFF";
-			btn.className = ""
-		}		
-	};
-	
+            btn.className = ""
+        }
+    };
+
     let trackerDude = function() {
         if(trackingEnabled) {
             if(lastQueryTime + (QUERY_INTERVAL * 1000) < Date.now()) {
@@ -162,9 +168,9 @@
     let getPrice = function() {
         // have to deal with CORS
         // let cors_api_host = 'cors-anywhere.herokuapp.com';
-	let cors_api_host = 'knooks-corsanywhere.herokuapp.com'
+    let cors_api_host = 'knooks-corsanywhere.herokuapp.com'
         let cors_api_url = 'https://' + cors_api_host + '/';
-		let code = stockCode.value;
+        let code = stockCode.value;
 
         let query = cors_api_url + queryTemplate.replace("{STOCK_CODE}",code);
 
@@ -173,13 +179,20 @@
             mode: 'cors',
             method: 'get'
         }).then(function(response) {
-            response.json().then(data => readPriceFromJSON(code, data));
+            try {
+                response.json().then(data => readPriceFromJSON(code, data));
+            } catch(err) {
+                addErrorHistory(err);
+            }
         }).catch(function(err) {
-            // Error :(
-            console.log(err);
-            updateHistory({
-                text: "I AM ERROR"
-            });
+            addErrorHistory(err);
+        });
+    };
+
+    let addErrorHistory = function(err) {
+        console.log(err);
+        updateHistory({
+            text: "I AM ERROR"
         });
     };
 
@@ -187,24 +200,40 @@
         let price = data.chart.result[0].meta.regularMarketPrice;
         let time = data.chart.result[0].meta.regularMarketTime;
         let timeString = new Date(time * 1000).toLocaleString();
-        let newPrice = {
-			code: code,
-            regularMarketPrice: price,
-            regularMarketTime: time,
-            text: code + ": " + price + " at " + timeString
-        };
-        console.log(newPrice);
-        updateHistory(newPrice);
-        checkForAlarm(newPrice);
+
+        if(price) {
+            let newPrice = {
+                code: code,
+                regularMarketPrice: price,
+                regularMarketTime: time,
+                text: code + ": " + price + " at " + timeString
+            };
+            // set style class to apply based on the most recent price
+            if(priceHistory[0] && priceHistory[0].hasOwnProperty("regularMarketPrice")) {
+                if(price > priceHistory[0].regularMarketPrice) {
+                    newPrice.className = "up";
+                } else if(price < priceHistory[0].regularMarketPrice) {
+                    newPrice.className = "down";
+                } else {
+                    newPrice.className = "";
+                }
+            }
+            console.log(newPrice);
+            updateHistory(newPrice);
+            checkForAlarm(newPrice);
+        } else {
+            addErrorHistory("No price returned");
+        }
     };
 
     let updateHistory = function(newPrice) {
         priceHistory.pop();
         priceHistory.unshift(newPrice);
         for(let i = 0; i < priceHistory.length; i++) {
-            let thisTracker = document.getElementById("tracker" + i);
-            if(thisTracker) {
-                thisTracker.innerText = priceHistory[i].text;
+            let thisticker = document.getElementById("ticker" + i);
+            if(thisticker) {
+                thisticker.innerText = priceHistory[i].text;
+                thisticker.className = priceHistory[i].className;
             }
         }
     };
@@ -217,26 +246,26 @@
 
     let checkForAlarm = function(newPrice) {
         if(newPrice.hasOwnProperty("regularMarketPrice")) {
-			if(dipAlarmEnabled) {
-				let alarmAt = dipAlarm.value;
-				if (newPrice.regularMarketPrice <= alarmAt) {
-					triggerAlarm(DIP_VID);
-				}
-			}
+            if(dipAlarmEnabled) {
+                let alarmAt = dipAlarm.value;
+                if (newPrice.regularMarketPrice <= alarmAt) {
+                    triggerAlarm(DIP_VID);
+                }
+            }
 
-			if(skyAlarmEnabled) {
-				let alarmAt = skyAlarm.value;
-				if (newPrice.regularMarketPrice >= alarmAt) {
-					triggerAlarm(SKY_VID);
-				}
-			}
-		}
+            if(skyAlarmEnabled) {
+                let alarmAt = skyAlarm.value;
+                if (newPrice.regularMarketPrice >= alarmAt) {
+                    triggerAlarm(SKY_VID);
+                }
+            }
+        }
     };
 
     let triggerAlarm = function(url) {
         let alarmEmbedCode = "<iframe id=\"toDaMoon\" width=\"560\" height=\"315\" src=\"" + url + "\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>"
         document.body.insertAdjacentHTML("beforeend", alarmEmbedCode);
-		stopTracking();
+        stopTracking();
     };
 
 </script>
