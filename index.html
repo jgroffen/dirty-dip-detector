@@ -102,7 +102,7 @@
         toggleSkyAlarmButton.onclick = toggleSkyAlarm;
         testButton.onclick = function() {
 			triggerAlarm(DIP_VID);
-		}
+		};
 
         setInterval(trackerDude, 1000);
     };
@@ -168,7 +168,7 @@
     let getPrice = function() {
         // have to deal with CORS
         // let cors_api_host = 'cors-anywhere.herokuapp.com';
-    let cors_api_host = 'knooks-corsanywhere.herokuapp.com'
+        let cors_api_host = 'knooks-corsanywhere.herokuapp.com';
         let cors_api_url = 'https://' + cors_api_host + '/';
         let code = stockCode.value;
 
@@ -227,13 +227,19 @@
     };
 
     let updateHistory = function(newPrice) {
-        priceHistory.pop();
-        priceHistory.unshift(newPrice);
+        if(newPrice.className === "" &&
+            priceHistory[0] && priceHistory[0].hasOwnProperty("className") && priceHistory[0].className === "") {
+            // price didn't change for two consecutive queries, just update the most recent entry
+            priceHistory[0] = newPrice;
+        } else {
+            priceHistory.pop();
+            priceHistory.unshift(newPrice);
+        }
         for(let i = 0; i < priceHistory.length; i++) {
-            let thisticker = document.getElementById("ticker" + i);
-            if(thisticker) {
-                thisticker.innerText = priceHistory[i].text;
-                thisticker.className = priceHistory[i].className;
+            let thisTicker = document.getElementById("ticker" + i);
+            if(thisTicker) {
+                thisTicker.innerText = priceHistory[i].text;
+                thisTicker.className = priceHistory[i].className;
             }
         }
     };
